@@ -1,0 +1,81 @@
+{
+  "entities": {
+    "profile": {
+      "title": "UserProfile",
+      "description": "Player progression and statistics",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "username": { "type": "string" },
+        "level": { "type": "integer" },
+        "xp": { "type": "integer" },
+        "unlockedGenres": { "type": "array", "items": { "type": "string" } },
+        "ruleFragments": { "type": "array", "items": { "type": "string" } },
+        "totalMutationsSurvived": { "type": "integer" },
+        "highScores": { "type": "object" }
+      },
+      "required": ["uid", "username", "level", "xp"]
+    },
+    "leaderboard": {
+      "title": "LeaderboardEntry",
+      "description": "Scoring for a specific challenge",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "username": { "type": "string" },
+        "score": { "type": "integer" },
+        "timestamp": { "type": "integer" },
+        "challengeId": { "type": "string" }
+      },
+      "required": ["userId", "score", "challengeId"]
+    },
+    "challenge": {
+      "title": "Challenge",
+      "description": "Active game challenges",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "objective": { "type": "string" },
+        "rewardXp": { "type": "integer" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "specialMutations": { "type": "array", "items": { "type": "string" } }
+      },
+      "required": ["id", "title", "objective"]
+    },
+    "saveState": {
+      "title": "SaveState",
+      "description": "Persisted game session state",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "timestamp": { "type": "integer" },
+        "currentRule": { "type": "object" },
+        "stats": { "type": "object" },
+        "gameMode": { "type": "string" },
+        "challengeId": { "type": "string" },
+        "behavior": { "type": "object" }
+      },
+      "required": ["userId", "timestamp", "currentRule", "stats", "gameMode"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": "profile",
+      "description": "Private profile data"
+    },
+    "/leaderboards/{challengeId}/entries/{entryId}": {
+      "schema": "leaderboard",
+      "description": "Scores per challenge"
+    },
+    "/challenges/{challengeId}": {
+      "schema": "challenge",
+      "description": "Global challenges list"
+    },
+    "/saves/{userId}": {
+      "schema": "saveState",
+      "description": "User specific latest save state"
+    }
+  }
+}

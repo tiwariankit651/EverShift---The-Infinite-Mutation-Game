@@ -1,0 +1,84 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // HELPER FUNCTIONS
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(uid) { return isSignedIn() && request.auth.uid == uid; }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function isVerified() { return request.auth.token.email_verified == true; }
+
+    // VALIDATION BLUEPRINTS
+    function isValidProfile(data) {
+      return data.keys().hasAll(['uid', 'username', 'level', 'xp']) 
+        && data.uid == request.auth.uid
+        && data.username is string && data.username.size() <= 32
+        && data.level is int && data.level >= 1
+        && data.xp is int && data.xp >= 0;
+    }
+
+    function isValidLeaderboardEntry(data, challengeId) {
+      return data.keys().hasAll(['userId', 'username', 'score', 'timestamp', 'challengeId'])
+        && data.userId == request.auth.uid
+        && data.challengeId == challengeId
+        && data.score is int
+        && data.timestamp == request.time;
+    }
+
+    function isValidChallenge(data) {
+      return data.keys().hasAll(['id', 'title', 'objective', 'rules', 'rewardXp'])
+        && data.id is string
+        && data.title is string && data.title.size() <= 64
+        && data.objective is string && data.objective.size() <= 256
+        && data.rewardXp is int
+        && (!data.keys().contains('specialMutations') || data.specialMutations is list)
+        && (!data.keys().contains('authorId') || data.authorId == request.auth.uid);
+    }
+
+    function isValidSave(data, userId) {
+      return data.keys().hasAll(['userId', 'timestamp', 'currentRule', 'stats', 'gameMode'])
+        && data.userId == userId
+        && data.userId == request.auth.uid
+        && data.timestamp is int
+        && data.currentRule is map
+        && data.stats is map;
+    }
+
+    // MATCH BLOCKS
+    match /profiles/{userId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidProfile(incoming());
+      allow update: if isOwner(userId) && isValidProfile(incoming()) && (
+        // Allow updating XP and level, but not UID
+        incoming().diff(existing()).affectedKeys().hasOnly(['xp', 'level', 'ruleFragments', 'unlockedGenres', 'totalMutationsSurvived', 'highScores'])
+      );
+    }
+
+    match /saves/{userId} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidSave(incoming(), userId);
+    }
+
+    match /leaderboards/{challengeId}/entries/{entryId} {
+      allow list, get: if true;
+      allow create: if isSignedIn() 
+        && isValidId(challengeId)
+        && isValidLeaderboardEntry(incoming(), challengeId);
+      allow update: if isSignedIn() 
+        && isValidId(challengeId)
+        && isValidLeaderboardEntry(incoming(), challengeId)
+        && incoming().userId == existing().userId;
+    }
+
+    match /challenges/{challengeId} {
+      allow get, list: if true;
+      allow create: if isSignedIn() && isValidId(challengeId) && isValidChallenge(incoming());
+    }
+  }
+}
